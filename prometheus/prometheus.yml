@@ -1,0 +1,29 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    env: lab
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: node
+    static_configs:
+      - targets: ["node-exporter:9100"]
+        labels:
+          instance_role: host
+
+# 说明：站点的可用性探测交给 Uptime Kuma（HTTP 状态码、响应时间、证书到期），
+# 不再引入 blackbox_exporter。若之后要统一到 Prometheus 侧做黑盒探测，
+# 需要额外部署 blackbox_exporter 并配置 __param_target 相关 relabel，见 docs/design.md。
