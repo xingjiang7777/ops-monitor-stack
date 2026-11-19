@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>运维实验站 · ops-monitor-stack</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main>
+    <header>
+      <h1>运维实验站</h1>
+      <p class="sub">Docker Compose 编排的个人站点 + 监控告警栈，用于课程实践与故障演练，非生产环境。</p>
+    </header>
+
+    <section class="cards">
+      <a class="card" href="http://localhost:3000" target="_blank" rel="noopener">
+        <h2>Grafana</h2>
+        <p>主机总览看板：CPU、内存、磁盘预测、网络吞吐</p>
+      </a>
+      <a class="card" href="http://localhost:9090" target="_blank" rel="noopener">
+        <h2>Prometheus</h2>
+        <p>指标抓取与告警规则求值</p>
+      </a>
+      <a class="card" href="http://localhost:9093" target="_blank" rel="noopener">
+        <h2>Alertmanager</h2>
+        <p>告警分组、抑制与静默</p>
+      </a>
+      <a class="card" href="http://localhost:3001" target="_blank" rel="noopener">
+        <h2>Uptime Kuma</h2>
+        <p>站点可用性与响应时间探测</p>
+      </a>
+    </section>
+
+    <section class="note">
+      <h2>这套栈解决什么问题</h2>
+      <ul>
+        <li>把"服务是否活着"从人工巡检变成分钟级自动发现</li>
+        <li>磁盘写满这类渐进式故障，用 <code>predict_linear</code> 提前 4 小时预警，而不是等它挂</li>
+        <li>告警经中继去重后推送到飞书群，避免同一故障刷屏</li>
+      </ul>
+    </section>
+
+    <footer>
+      <p>静态页面由 Nginx 提供 · 健康检查 <code>/healthz</code></p>
+    </footer>
+  </main>
+</body>
+</html>
