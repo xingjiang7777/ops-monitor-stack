@@ -1,0 +1,9 @@
+# 统一行尾，避免 Windows 检出后 .sh 带 CRLF，在容器/Linux 里报 $'\r': command not found
+* text=auto eol=lf
+
+*.sh   text eol=lf
+*.py   text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.md   text eol=lf
