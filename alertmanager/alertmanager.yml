@@ -1,0 +1,27 @@
+route:
+  receiver: feishu-relay
+  group_by: ["alertname", "instance"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers:
+        - severity = "critical"
+      receiver: feishu-relay
+      group_wait: 10s
+      repeat_interval: 1h
+
+inhibit_rules:
+  # 主机整体失联时，不要再刷磁盘、内存这类衍生告警
+  - source_matchers:
+      - alertname = "InstanceDown"
+    target_matchers:
+      - severity =~ "warning|info"
+    equal: ["instance"]
+
+receivers:
+  - name: feishu-relay
+    webhook_configs:
+      - url: http://alert-relay:8088/webhook
+        send_resolved: true
+        max_alerts: 0
