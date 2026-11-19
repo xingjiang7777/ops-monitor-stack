@@ -1,0 +1,132 @@
+name: ops-monitor
+
+# 统一日志上限：默认 json-file 驱动不会轮转，曾因单文件涨到 9G 把根分区写满，
+# 复盘见 docs/incident-disk-full.md
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "3"
+
+networks:
+  monitor:
+    driver: bridge
+
+volumes:
+  prometheus-data:
+  alertmanager-data:
+  grafana-data:
+  uptime-kuma-data:
+
+services:
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: ops-node-exporter
+    restart: unless-stopped
+    pid: host
+    command:
+      - --path.rootfs=/host
+    volumes:
+      - /:/host:ro,rslave
+    expose:
+      - "9100"
+    logging: *default-logging
+    networks:
+      - monitor
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: ops-prometheus
+    restart: unless-stopped
+    depends_on:
+      - node-exporter
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-lifecycle
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    logging: *default-logging
+    networks:
+      - monitor
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: ops-alertmanager
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    ports:
+      - "9093:9093"
+    logging: *default-logging
+    networks:
+      - monitor
+
+  alert-relay:
+    build: ./relay
+    container_name: ops-alert-relay
+    restart: unless-stopped
+    environment:
+      - FEISHU_WEBHOOK=${FEISHU_WEBHOOK:-}
+      - DEDUP_WINDOW=${DEDUP_WINDOW:-300}
+    depends_on:
+      - alertmanager
+    ports:
+      - "8088:8088"
+    logging: *default-logging
+    networks:
+      - monitor
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: ops-grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin123}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    logging: *default-logging
+    networks:
+      - monitor
+
+  uptime-kuma:
+    image: louislam/uptime-kuma:1.23.13
+    container_name: ops-uptime-kuma
+    restart: unless-stopped
+    volumes:
+      - uptime-kuma-data:/app/data
+    ports:
+      - "3001:3001"
+    logging: *default-logging
+    networks:
+      - monitor
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: ops-nginx
+    restart: unless-stopped
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./site:/usr/share/nginx/html:ro
+    ports:
+      - "8080:80"
+    logging: *default-logging
+    networks:
+      - monitor
