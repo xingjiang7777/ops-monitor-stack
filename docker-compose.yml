@@ -17,6 +17,7 @@ volumes:
   alertmanager-data:
   grafana-data:
   uptime-kuma-data:
+  coroot-data:
 
 services:
   node-exporter:
@@ -127,6 +128,45 @@ services:
       - ./site:/usr/share/nginx/html:ro
     ports:
       - "8080:80"
+    logging: *default-logging
+    networks:
+      - monitor
+
+  # ---------------- 可选：eBPF 视角 ----------------
+  # 指标视角（node-exporter）回答"资源用了多少"；eBPF 视角回答"谁在拖慢谁"，
+  # 不用改代码、不用埋点就能拿到服务拓扑与调用关系。
+  # 需要内核 >= 5.4 且宿主机允许 privileged 容器，所以放在 ebpf profile 里，
+  # 默认 `docker compose up -d` 不会启动它。
+  #   docker compose --profile ebpf up -d
+  coroot:
+    image: ghcr.io/coroot/coroot:latest
+    container_name: ops-coroot
+    restart: unless-stopped
+    profiles: ["ebpf"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - coroot-data:/data
+    ports:
+      # 8080 已被 nginx 占用，这里换 8085
+      - "8085:8080"
+    logging: *default-logging
+    networks:
+      - monitor
+
+  coroot-node-agent:
+    image: ghcr.io/coroot/coroot-node-agent:latest
+    container_name: ops-coroot-agent
+    restart: unless-stopped
+    profiles: ["ebpf"]
+    privileged: true
+    pid: host
+    command:
+      - --collector.endpoint=http://coroot:8080
+      - --collector.insecure=true
+    volumes:
+      - /sys/kernel/debug:/sys/kernel/debug:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
     logging: *default-logging
     networks:
       - monitor

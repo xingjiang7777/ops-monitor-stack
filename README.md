@@ -107,11 +107,33 @@ make down        # 停止并保留数据卷
 make clean       # 停止并删除数据卷（会丢历史数据）
 ```
 
-## 7. 目录结构
+## 7. 可选：换一个视角看问题（eBPF）
+
+前面这套（node-exporter + Prometheus）是指标视角：**资源用了多少、有没有越过阈值**。
+它答不了另一个问题：**service A 变慢，是 B 拖的，还是 C 拖的？**
+
+[eBPF](https://ebpf.io/) 视角（[coroot/coroot](https://github.com/coroot/coroot)，Apache-2.0）不需要在代码里加埋点，直接从内核抓网络与进程调用，自动生成服务拓扑：
+
+```bash
+docker compose --profile ebpf up -d     # 默认 up 不会启动它
+# 打开 http://localhost:8085
+```
+
+它被放进 `ebpf` profile，是因为有三个硬条件：**内核 ≥ 5.4**、宿主机允许 `privileged` 容器、能看到 `/sys/kernel/debug`。少一个就起不来，所以不该拖累默认路径。
+
+两种视角的分工，也是面试里可以讲的一段：
+
+| | 指标视角（本仓库默认） | eBPF 视角（可选） |
+| --- | --- | --- |
+| 回答什么 | 资源够不够、有没有越线 | 谁在拖慢谁、调用链长什么样 |
+| 成本 | 低：一个 exporter，几 MB | 高：需要特权容器与内核支持，常驻内存几百 MB |
+| 盲区 | 不知道请求在服务之间怎么走 | 拿不到"磁盘还剩多少"这类资源事实 |
+
+## 8. 目录结构
 
 ```
 .
-├── docker-compose.yml            # 7 个服务 + 统一日志上限锚点
+├── docker-compose.yml            # 7 个默认服务 + ebpf profile + 统一日志上限锚点
 ├── .env.example
 ├── prometheus/
 │   ├── prometheus.yml
@@ -134,13 +156,13 @@ make clean       # 停止并删除数据卷（会丢历史数据）
 └── Makefile
 ```
 
-## 8. 已知限制
+## 9. 已知限制
 
 - 单机部署，宿主机宕机则监控同时失效；
 - 未配置 HTTPS 与鉴权，**不要直接暴露到公网**；
 - 告警中继无重试队列，飞书接口抖动会丢单条消息（已用规则反向监控外发失败率）；
-- Prometheus 数据保留 15 天，未接远程存储。
+- Prometheus 数据保留 15 天，未接远程存储；ebpf profile 需内核 5.4+ 与特权容器，Windows/macOS 上的 Docker Desktop 默认拿不到 /sys/kernel/debug。
 
-## 9. License
+## 10. License
 
 MIT
